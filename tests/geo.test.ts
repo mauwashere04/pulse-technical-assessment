@@ -35,6 +35,14 @@ describe("applyPrivacyOffset", () => {
     assert.ok(out.lat <= 90);
     assert.ok(out.lng <= 180 && out.lng >= -180);
   });
+
+  it("honors a custom min/max km range", () => {
+    for (let i = 0; i < 20; i++) {
+      const out = applyPrivacyOffset(14.5995, 120.9842, 10, 20);
+      const d = distanceKm(14.5995, 120.9842, out.lat, out.lng);
+      assert.ok(d >= 9.5 && d <= 20.5, `distance was ${d}`);
+    }
+  });
 });
 
 describe("isValidLatLng", () => {

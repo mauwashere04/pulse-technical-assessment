@@ -1,14 +1,16 @@
 // Client-side helpers for talking to the coordination API.
 import type { PollResponse, SignalType } from "@/lib/types";
+import type { Horizon } from "@/lib/horizons";
 
 export async function join(
   lat: number,
   lng: number,
+  horizon: Horizon,
 ): Promise<{ id: string; secret: string; lat: number; lng: number }> {
   const res = await fetch("/api/join", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lat, lng }),
+    body: JSON.stringify({ lat, lng, horizon }),
   });
   if (!res.ok) throw new Error(`join failed: ${res.status}`);
   const data = (await res.json()) as {

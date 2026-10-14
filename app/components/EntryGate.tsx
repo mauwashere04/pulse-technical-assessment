@@ -1,16 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import type { Horizon } from "@/lib/horizons";
+
+const HORIZONS: { value: Horizon; label: string }[] = [
+  { value: "close", label: "Close · 1–3 km" },
+  { value: "city", label: "City · 10–20 km" },
+  { value: "coast", label: "Coast · 50–100 km" },
+];
 
 export default function EntryGate({
   onReady,
   errorText,
 }: {
-  onReady: (lat: number, lng: number) => void;
+  onReady: (lat: number, lng: number, horizon: Horizon) => void;
   errorText?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "locating" | "error">("idle");
   const [error, setError] = useState<string>("");
+  const [horizon, setHorizon] = useState<Horizon>("close");
 
   function enter() {
     if (!("geolocation" in navigator)) {
@@ -20,7 +28,7 @@ export default function EntryGate({
     }
     setStatus("locating");
     navigator.geolocation.getCurrentPosition(
-      (pos) => onReady(pos.coords.latitude, pos.coords.longitude),
+      (pos) => onReady(pos.coords.latitude, pos.coords.longitude, horizon),
       (err) => {
         setStatus("error");
         setError(
@@ -50,6 +58,26 @@ export default function EntryGate({
 
       <p className="max-w-[28rem] text-base text-[var(--muted)]">
         Strangers, as dots on a globe. Tap one. Talk. Leave, and it is gone.
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {HORIZONS.map((h) => (
+          <button
+            key={h.value}
+            type="button"
+            onClick={() => setHorizon(h.value)}
+            className={`rounded-full border px-3 py-1.5 text-sm transition ${
+              horizon === h.value
+                ? "border-[var(--brass)] text-[var(--ink)]"
+                : "border-[var(--line)] text-[var(--muted)]"
+            }`}
+          >
+            {h.label}
+          </button>
+        ))}
+      </div>
+      <p className="max-w-[28rem] text-xs text-[var(--muted)]">
+        Close is the default. City and Coast push the public dot further out.
       </p>
 
       <button

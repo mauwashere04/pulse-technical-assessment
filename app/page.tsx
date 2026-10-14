@@ -10,6 +10,7 @@ import { join, leave, poll, sendSignal } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
 import { type PeerDot, type SignalMsg } from "@/lib/types";
+import type { Horizon } from "@/lib/horizons";
 
 type Conn =
   | { kind: "idle" }
@@ -362,10 +363,10 @@ export default function Home() {
     };
   }, [session, phase]);
 
-  async function handleReady(lat: number, lng: number) {
+  async function handleReady(lat: number, lng: number, horizon: Horizon) {
     setGateError("");
     try {
-      const placed = await join(lat, lng);
+      const placed = await join(lat, lng, horizon);
       setSession({ id: placed.id, secret: placed.secret });
       setMyLocation({ lat: placed.lat, lng: placed.lng });
       setPhase("live");

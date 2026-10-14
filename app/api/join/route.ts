@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
 import { hashSecret, newSecret } from "@/lib/auth";
 import { clientKey, hitRateLimit } from "@/lib/rate-limit";
+import { horizonRange } from "@/lib/horizons";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,12 +20,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { lat, lng } = (body ?? {}) as Record<string, unknown>;
+  const { lat, lng, horizon } = (body ?? {}) as Record<string, unknown>;
   if (!isValidLatLng(lat, lng)) {
     return Response.json({ error: "invalid coordinates" }, { status: 400 });
   }
-
-  const offset = applyPrivacyOffset(lat as number, lng as number);
+  const range = horizonRange(horizon);
+  if (!range) {
+    return Response.json({ error: "invalid horizon" }, { status: 400 });
+  }
+  const offset = applyPrivacyOffset(
+    lat as number,
+    lng as number,
+    range.minKm,
+    range.maxKm,
+  );
   const id = crypto.randomUUID();
   const secret = newSecret();
 

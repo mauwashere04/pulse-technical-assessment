@@ -8,8 +8,10 @@ const KM_PER_DEG_LAT = 111.32;
 export function applyPrivacyOffset(
   lat: number,
   lng: number,
+  minKm: number = 1,
+  maxKm: number = 3,
 ): { lat: number; lng: number } {
-  const distanceKm = 1 + Math.random() * 2; // 1–3 km
+  const distanceKm = minKm + Math.random() * (maxKm - minKm);
   const bearing = Math.random() * 2 * Math.PI; // random direction
 
   const dLat = (distanceKm * Math.cos(bearing)) / KM_PER_DEG_LAT;
