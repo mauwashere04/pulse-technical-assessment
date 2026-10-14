@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
+import { heartbeatFilter } from "@/lib/presence-rules";
 import type { PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,10 +23,13 @@ export async function GET(request: NextRequest) {
   const signalCutoff = new Date(now - SIGNAL_TTL_MS);
 
   // 1) Heartbeat — refresh lastSeen for the caller.
-  await prisma.presence.updateMany({
-    where: {},
+  const updated = await prisma.presence.updateMany({
+    where: heartbeatFilter(id),
     data: { lastSeen: new Date(now) },
   });
+  if (updated.count === 0) {
+    return Response.json({ error: "unknown session" }, { status: 401 });
+  }
 
   // 2) Reap stale presence rows and orphaned signals (independent deletes —
   // no atomicity needed, and avoids transactions over a PgBouncer pooler).
