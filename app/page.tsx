@@ -25,7 +25,13 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export default function Home() {
   const [phase, setPhase] = useState<"gate" | "live">("gate");
   const [gateError, setGateError] = useState<string>("");
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [session, setSession] = useState<{ id: string; secret: string } | null>(
+    null,
+  );
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
   const [peers, setPeers] = useState<PeerDot[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -78,7 +84,8 @@ export default function Home() {
   function startPeer(peerId: string, initiator: boolean) {
     const ps = new PeerSession(initiator, {
       onSignal: (type: DescType, payload: string) => {
-        void sendSignal(sessionId, peerId, type, payload);
+        const s = sessionRef.current;
+        if (s) void sendSignal(s.id, peerId, type, s.secret, payload);
       },
       onChat: (text) => addMessage(false, text),
       onControl: (ctrl) => handleControl(ctrl),
@@ -131,45 +138,61 @@ export default function Home() {
   }
 
   function requestConnection(peerId: string) {
-    if (connRef.current.kind !== "idle") return;
+    if (connRef.current.kind !== "idle" || !session) return;
     setConn({ kind: "requesting", peerId });
-    void sendSignal(sessionId, peerId, "request");
+    void sendSignal(session.id, peerId, "request", session.secret);
     requestTimer.current = setTimeout(() => {
       if (
         connRef.current.kind === "requesting" &&
-        connRef.current.peerId === peerId
+        connRef.current.peerId === peerId &&
+        sessionRef.current
       ) {
-        void sendSignal(sessionId, peerId, "end");
+        void sendSignal(
+          sessionRef.current.id,
+          peerId,
+          "end",
+          sessionRef.current.secret,
+        );
         teardown("No answer.");
       }
     }, REQUEST_TIMEOUT_MS);
   }
 
   function cancelRequest() {
-    if (connRef.current.kind === "requesting") {
-      void sendSignal(sessionId, connRef.current.peerId, "end");
+    if (connRef.current.kind === "requesting" && session) {
+      void sendSignal(
+        session.id,
+        connRef.current.peerId,
+        "end",
+        session.secret,
+      );
     }
     teardown();
   }
 
   function acceptIncoming() {
-    if (connRef.current.kind !== "incoming") return;
+    if (connRef.current.kind !== "incoming" || !session) return;
     const peerId = connRef.current.peerId;
     startPeer(peerId, false);
-    void sendSignal(sessionId, peerId, "accept");
+    void sendSignal(session.id, peerId, "accept", session.secret);
     setConn({ kind: "connecting", peerId });
   }
 
   function declineIncoming() {
-    if (connRef.current.kind !== "incoming") return;
-    void sendSignal(sessionId, connRef.current.peerId, "decline");
+    if (connRef.current.kind !== "incoming" || !session) return;
+    void sendSignal(
+      session.id,
+      connRef.current.peerId,
+      "decline",
+      session.secret,
+    );
     setConn({ kind: "idle" });
   }
 
   function endConnection() {
     const c = connRef.current;
-    if (c.kind === "connecting" || c.kind === "connected") {
-      void sendSignal(sessionId, c.peerId, "end");
+    if ((c.kind === "connecting" || c.kind === "connected") && session) {
+      void sendSignal(session.id, c.peerId, "end", session.secret);
     }
     teardown();
   }
@@ -215,8 +238,13 @@ export default function Home() {
       case "request": {
         if (connRef.current.kind === "idle") {
           setConn({ kind: "incoming", peerId: sig.fromId });
-        } else {
-          void sendSignal(sessionId, sig.fromId, "decline");
+        } else if (sessionRef.current) {
+          void sendSignal(
+            sessionRef.current.id,
+            sig.fromId,
+            "decline",
+            sessionRef.current.secret,
+          );
         }
         break;
       }
@@ -273,13 +301,13 @@ export default function Home() {
   });
 
   useEffect(() => {
-    if (phase !== "live" || !sessionId) return;
+    if (phase !== "live" || !session) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const tick = async () => {
       try {
-        const data = await poll(sessionId);
+        const data = await poll(session.id, session.secret);
         if (!active) return;
         setPeers(data.peers);
 
@@ -295,7 +323,12 @@ export default function Home() {
               } else if (current.kind === "requesting") {
                 teardown("They left.");
               } else {
-                void sendSignal(sessionId, current.peerId, "end");
+                void sendSignal(
+                  session.id,
+                  current.peerId,
+                  "end",
+                  session.secret,
+                );
                 teardown("Stranger disconnected.");
               }
             }
@@ -316,24 +349,25 @@ export default function Home() {
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [phase, sessionId]);
+  }, [phase, session]);
 
   useEffect(() => {
-    if (!sessionId || phase !== "live") return;
-    const onLeave = () => leave(sessionId);
+    if (!session || phase !== "live") return;
+    const onLeave = () => leave(session.id, session.secret);
     window.addEventListener("pagehide", onLeave);
     window.addEventListener("beforeunload", onLeave);
     return () => {
       window.removeEventListener("pagehide", onLeave);
       window.removeEventListener("beforeunload", onLeave);
     };
-  }, [sessionId, phase]);
+  }, [session, phase]);
 
   async function handleReady(lat: number, lng: number) {
     setGateError("");
     try {
-      const placed = await join(sessionId, lat, lng);
-      setMyLocation(placed);
+      const placed = await join(lat, lng);
+      setSession({ id: placed.id, secret: placed.secret });
+      setMyLocation({ lat: placed.lat, lng: placed.lng });
       setPhase("live");
     } catch {
       setPhase("gate");

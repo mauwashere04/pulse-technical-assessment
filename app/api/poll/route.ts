@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
 import { heartbeatFilter } from "@/lib/presence-rules";
+import { readSecret, requireSession } from "@/lib/auth";
 import type { PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -13,9 +14,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const id = params.get("id");
-
-  if (!id) {
-    return Response.json({ error: "missing id" }, { status: 400 });
+  const secret = readSecret(request);
+  const session = id ? await requireSession(id, secret) : null;
+  if (!id || !session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const now = Date.now();
@@ -23,13 +25,10 @@ export async function GET(request: NextRequest) {
   const signalCutoff = new Date(now - SIGNAL_TTL_MS);
 
   // 1) Heartbeat — refresh lastSeen for the caller.
-  const updated = await prisma.presence.updateMany({
+  await prisma.presence.updateMany({
     where: heartbeatFilter(id),
     data: { lastSeen: new Date(now) },
   });
-  if (updated.count === 0) {
-    return Response.json({ error: "unknown session" }, { status: 401 });
-  }
 
   // 2) Reap stale presence rows and orphaned signals (independent deletes —
   // no atomicity needed, and avoids transactions over a PgBouncer pooler).

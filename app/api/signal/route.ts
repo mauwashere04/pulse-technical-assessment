@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { readSecret, requireSession } from "@/lib/auth";
 import type { SignalType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -45,6 +46,12 @@ export async function POST(request: NextRequest) {
     (typeof payload !== "string" || payload.length > MAX_PAYLOAD)
   ) {
     return Response.json({ error: "invalid payload" }, { status: 400 });
+  }
+
+  const secret = readSecret(request);
+  const sender = await requireSession(fromId, secret);
+  if (!sender) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const signalType = type as SignalType;
