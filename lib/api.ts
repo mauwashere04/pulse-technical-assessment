@@ -68,6 +68,17 @@ export async function wave(id: string, secret: string): Promise<boolean> {
   return res.ok;
 }
 
+export async function block(id: string, secret: string, blockedId: string): Promise<void> {
+  await fetch("/api/block", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-pulse-secret": secret,
+    },
+    body: JSON.stringify({ id, blockedId }),
+  });
+}
+
 // Fire-and-forget leave that survives the tab closing.
 export function leave(id: string, secret: string): void {
   const body = JSON.stringify({ id, secret });

@@ -6,7 +6,7 @@ import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import VideoPanel from "./components/VideoPanel";
-import { join, leave, poll, sendSignal, wave } from "@/lib/api";
+import { block, join, leave, poll, sendSignal, wave } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
 import { type PeerDot, type SignalMsg, type WaveDot } from "@/lib/types";
@@ -200,6 +200,14 @@ export default function Home() {
     teardown();
   }
 
+  function blockCurrentPeer() {
+    const c = connRef.current;
+    if ((c.kind === "connecting" || c.kind === "connected") && session) {
+      void block(session.id, session.secret, c.peerId);
+    }
+    teardown("Blocked for this session.");
+  }
+
   function startVideoRequest() {
     if (videoRef.current !== "none" || !peerRef.current) return;
     setVideo("requesting");
@@ -302,6 +310,28 @@ export default function Home() {
   useEffect(() => {
     processSignalRef.current = processSignal;
   });
+
+  // Esc backs out of video first, then the chat — never blocks anyone.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (videoRef.current === "incoming") {
+        declineVideo();
+      } else if (
+        videoRef.current === "active" ||
+        videoRef.current === "requesting"
+      ) {
+        endVideo();
+      } else if (
+        connRef.current.kind === "connecting" ||
+        connRef.current.kind === "connected"
+      ) {
+        endConnection();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (phase !== "live" || !session) return;
@@ -449,6 +479,7 @@ export default function Home() {
           }}
           onStartVideo={startVideoRequest}
           onEnd={endConnection}
+          onBlock={blockCurrentPeer}
         />
       )}
 

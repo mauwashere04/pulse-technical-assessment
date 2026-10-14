@@ -15,6 +15,7 @@ export default function ChatPanel({
   onSend,
   onStartVideo,
   onEnd,
+  onBlock,
 }: {
   messages: ChatMessage[];
   connected: boolean;
@@ -22,9 +23,29 @@ export default function ChatPanel({
   onSend: (text: string) => void;
   onStartVideo: () => void;
   onEnd: () => void;
+  onBlock: () => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [blockArmed, setBlockArmed] = useState(false);
+  const blockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  function handleBlockClick() {
+    if (blockArmed) {
+      if (blockTimer.current) clearTimeout(blockTimer.current);
+      setBlockArmed(false);
+      onBlock();
+      return;
+    }
+    setBlockArmed(true);
+    blockTimer.current = setTimeout(() => setBlockArmed(false), 3_000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (blockTimer.current) clearTimeout(blockTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,6 +77,12 @@ export default function ChatPanel({
             className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm hover:border-[var(--ink)]/40 disabled:opacity-40"
           >
             Camera
+          </button>
+          <button
+            onClick={handleBlockClick}
+            className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] hover:border-[var(--ink)]/40"
+          >
+            {blockArmed ? "Block them?" : "Block"}
           </button>
           <button
             onClick={onEnd}

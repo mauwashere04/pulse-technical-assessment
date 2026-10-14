@@ -37,10 +37,19 @@ export async function GET(request: NextRequest) {
   await prisma.signal.deleteMany({ where: { createdAt: { lt: signalCutoff } } });
   await prisma.wave.deleteMany({ where: { createdAt: { lt: waveCutoff } } });
 
-  // 3) Online peers, excluding self.
+  // 3) Online peers, excluding self and anyone blocked in either direction.
+  const blocks = await prisma.block.findMany({
+    where: { OR: [{ blockerId: id }, { blockedId: id }] },
+    select: { blockerId: true, blockedId: true },
+  });
+  const hidden = new Set<string>();
+  for (const b of blocks) {
+    hidden.add(b.blockerId === id ? b.blockedId : b.blockerId);
+  }
+
   const peers = await prisma.presence.findMany({
     where: {
-      id: { not: id },
+      id: { notIn: [id, ...hidden] },
       lastSeen: { gte: staleCutoff },
     },
     select: { id: true, lat: true, lng: true, busy: true },

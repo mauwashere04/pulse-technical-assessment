@@ -67,12 +67,21 @@ export async function POST(request: NextRequest) {
     const target = await prisma.presence.findUnique({
       where: { id: toId },
     });
+    const blocked = await prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: fromId, blockedId: toId },
+          { blockerId: toId, blockedId: fromId },
+        ],
+      },
+    });
     if (
       !target ||
       target.busy ||
       target.peerId ||
       sender.busy ||
-      sender.peerId
+      sender.peerId ||
+      blocked
     ) {
       await sendDecline(toId, fromId);
       return Response.json({ ok: true, autoDeclined: true });

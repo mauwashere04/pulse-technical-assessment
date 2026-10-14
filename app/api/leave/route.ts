@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
 
   await prisma.wave.deleteMany({ where: { fromId: id } });
 
+  await prisma.block.deleteMany({
+    where: { OR: [{ blockerId: id }, { blockedId: id }] },
+  });
+
   if (row?.peerId) {
     await prisma.signal.create({
       data: { fromId: id, toId: row.peerId, type: "end", payload: null },
