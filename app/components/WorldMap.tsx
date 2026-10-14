@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
-import type { PeerDot } from "@/lib/types";
+import type { PeerDot, WaveDot } from "@/lib/types";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -27,17 +27,20 @@ function dotColor(id: string): string {
 export default function WorldMap({
   peers,
   me,
+  waves,
   onPeerClick,
   canConnect,
 }: {
   peers: PeerDot[];
   me: { lat: number; lng: number } | null;
+  waves: WaveDot[];
   onPeerClick: (id: string) => void;
   canConnect: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
+  const waveMarkersRef = useRef<Map<string, Marker>>(new Map());
   const meMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -89,6 +92,8 @@ export default function WorldMap({
       cancelled = true;
       markers.forEach((m) => m.remove());
       markers.clear();
+      waveMarkersRef.current.forEach((m) => m.remove());
+      waveMarkersRef.current.clear();
       meMarkerRef.current?.remove();
       meMarkerRef.current = null;
       mapRef.current?.remove();
@@ -172,6 +177,42 @@ export default function WorldMap({
       cancelled = true;
     };
   }, [peers, ready]);
+
+  // Reconcile short-lived wave ripples (Task 13).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    let cancelled = false;
+
+    (async () => {
+      const mapboxgl = (await import("mapbox-gl")).default;
+      if (cancelled) return;
+      const markers = waveMarkersRef.current;
+      const seen = new Set<string>();
+
+      for (const w of waves) {
+        seen.add(w.id);
+        if (markers.has(w.id)) continue;
+        const el = document.createElement("div");
+        el.className = "pulse-wave";
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([w.lng, w.lat])
+          .addTo(map);
+        markers.set(w.id, marker);
+      }
+
+      for (const [id, marker] of markers) {
+        if (!seen.has(id)) {
+          marker.remove();
+          markers.delete(id);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [waves, ready]);
 
   return (
     <div className="absolute inset-0">

@@ -56,6 +56,18 @@ export async function sendSignal(
   });
 }
 
+export async function wave(id: string, secret: string): Promise<boolean> {
+  const res = await fetch("/api/wave", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-pulse-secret": secret,
+    },
+    body: JSON.stringify({ id }),
+  });
+  return res.ok;
+}
+
 // Fire-and-forget leave that survives the tab closing.
 export function leave(id: string, secret: string): void {
   const body = JSON.stringify({ id, secret });

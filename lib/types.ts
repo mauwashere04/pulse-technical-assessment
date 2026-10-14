@@ -26,7 +26,14 @@ export interface SignalMsg {
   createdAt: string;
 }
 
+export interface WaveDot {
+  id: string;
+  lat: number;
+  lng: number;
+}
+
 export interface PollResponse {
   peers: PeerDot[];
   signals: SignalMsg[];
+  waves: WaveDot[];
 }

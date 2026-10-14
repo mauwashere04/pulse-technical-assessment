@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
+import { STALE_MS, SIGNAL_TTL_MS, WAVE_TTL_MS } from "@/lib/presence";
 import { heartbeatFilter } from "@/lib/presence-rules";
 import { readSecret, requireSession } from "@/lib/auth";
 import type { PollResponse } from "@/lib/types";
@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   const now = Date.now();
   const staleCutoff = new Date(now - STALE_MS);
   const signalCutoff = new Date(now - SIGNAL_TTL_MS);
+  const waveCutoff = new Date(now - WAVE_TTL_MS);
 
   // 1) Heartbeat — refresh lastSeen for the caller.
   await prisma.presence.updateMany({
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
   // no atomicity needed, and avoids transactions over a PgBouncer pooler).
   await prisma.presence.deleteMany({ where: { lastSeen: { lt: staleCutoff } } });
   await prisma.signal.deleteMany({ where: { createdAt: { lt: signalCutoff } } });
+  await prisma.wave.deleteMany({ where: { createdAt: { lt: waveCutoff } } });
 
   // 3) Online peers, excluding self.
   const peers = await prisma.presence.findMany({
@@ -65,6 +67,12 @@ export async function GET(request: NextRequest) {
     RETURNING "id", "fromId", "toId", "type", "payload", "createdAt"
   `;
 
+  const waves = await prisma.wave.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 40,
+    select: { id: true, lat: true, lng: true },
+  });
+
   const response: PollResponse = {
     peers: peers.map((p) => ({
       id: p.id,
@@ -80,6 +88,7 @@ export async function GET(request: NextRequest) {
       payload: s.payload,
       createdAt: new Date(s.createdAt).toISOString(),
     })),
+    waves,
   };
 
   return Response.json(response);

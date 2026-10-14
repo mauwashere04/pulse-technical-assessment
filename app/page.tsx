@@ -6,10 +6,10 @@ import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import VideoPanel from "./components/VideoPanel";
-import { join, leave, poll, sendSignal } from "@/lib/api";
+import { join, leave, poll, sendSignal, wave } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
-import { type PeerDot, type SignalMsg } from "@/lib/types";
+import { type PeerDot, type SignalMsg, type WaveDot } from "@/lib/types";
 import type { Horizon } from "@/lib/horizons";
 
 type Conn =
@@ -34,6 +34,8 @@ export default function Home() {
     sessionRef.current = session;
   }, [session]);
   const [peers, setPeers] = useState<PeerDot[]>([]);
+  const [waves, setWaves] = useState<WaveDot[]>([]);
+  const [waveSendable, setWaveSendable] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -311,6 +313,7 @@ export default function Home() {
         const data = await poll(session.id, session.secret);
         if (!active) return;
         setPeers(data.peers);
+        setWaves(data.waves);
 
         const current = connRef.current;
         if (current.kind !== "idle") {
@@ -363,6 +366,13 @@ export default function Home() {
     };
   }, [session, phase]);
 
+  async function sendWave() {
+    if (!session || conn.kind !== "idle" || !waveSendable) return;
+    setWaveSendable(false);
+    window.setTimeout(() => setWaveSendable(true), 8_000);
+    await wave(session.id, session.secret);
+  }
+
   async function handleReady(lat: number, lng: number, horizon: Horizon) {
     setGateError("");
     try {
@@ -387,9 +397,18 @@ export default function Home() {
       <WorldMap
         peers={peers}
         me={myLocation}
+        waves={waves}
         onPeerClick={requestConnection}
         canConnect={conn.kind === "idle"}
       />
+
+      <button
+        onClick={sendWave}
+        disabled={conn.kind !== "idle" || !waveSendable}
+        className="pulse-glass absolute bottom-4 left-1/2 z-20 -translate-x-1/2 px-5 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-40"
+      >
+        Wave
+      </button>
 
       {notice && (
         <div className="pulse-glass absolute left-1/2 top-20 z-30 -translate-x-1/2 px-4 py-2 text-sm text-[var(--ink)]">
