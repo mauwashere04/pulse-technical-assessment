@@ -1,9 +1,12 @@
+import {
+  decodePeerMessage,
+  encodeChat,
+  encodeControl,
+  type PeerControl,
+} from "@/lib/peer-messages";
+
+export type { PeerControl };
 export type DescType = "offer" | "answer" | "ice";
-export type PeerControl =
-  | "video-request"
-  | "video-accept"
-  | "video-decline"
-  | "video-end";
 
 interface PeerCallbacks {
   onSignal: (type: DescType, payload: string) => void;
@@ -74,14 +77,10 @@ export class PeerSession {
   private wireDataChannel(dc: RTCDataChannel) {
     dc.onopen = () => this.cb.onChannelOpen();
     dc.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data as string);
-        if (msg.t === "chat" && typeof msg.text === "string") {
-          this.cb.onChat(msg.text);
-        } else if (msg.t === "ctrl" && typeof msg.ctrl === "string") {
-          this.cb.onControl(msg.ctrl as PeerControl);
-        }
-      } catch {}
+      const decoded = decodePeerMessage(String(e.data));
+      if (!decoded) return;
+      if (decoded.kind === "chat") this.cb.onChat(decoded.text);
+      else this.cb.onControl(decoded.ctrl);
     };
   }
 
@@ -129,11 +128,11 @@ export class PeerSession {
   }
 
   sendChat(text: string) {
-    this.safeSend({ t: "msg", text });
+    this.safeSend(JSON.parse(encodeChat(text)) as unknown);
   }
 
   sendControl(ctrl: PeerControl) {
-    this.safeSend({ t: "ctrl", ctrl });
+    this.safeSend(JSON.parse(encodeControl(ctrl)) as unknown);
   }
 
   private safeSend(obj: unknown) {
