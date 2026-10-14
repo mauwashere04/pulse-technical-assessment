@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSecret, requireSession } from "@/lib/auth";
+import { hitRateLimit } from "@/lib/rate-limit";
 import type { SignalType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
   const sender = await requireSession(fromId, secret);
   if (!sender) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (await hitRateLimit(`signal:${fromId}`, 40, 10_000)) {
+    return Response.json({ error: "slow down" }, { status: 429 });
   }
 
   const signalType = type as SignalType;

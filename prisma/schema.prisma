@@ -23,6 +23,14 @@ model Presence {
   @@index([lastSeen])
 }
 
+model RateHit {
+  id        String   @id @default(uuid())
+  bucket    String
+  createdAt DateTime @default(now())
+
+  @@index([bucket, createdAt])
+}
+
 model Invite {
   id        String   @id @default(uuid())
   fromId    String
