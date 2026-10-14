@@ -20,7 +20,8 @@ const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
 
 // POST /api/signal — body { fromId, toId, type, payload? }
 // Drops one message into the recipient's mailbox. Also manages the `busy`
-// flag so a user can only be in one connection at a time.
+// flag so a user can only be in one connection at a time, and rejects any
+// transition the sender isn't authorized to make (forged accept/offer/etc).
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -57,28 +58,40 @@ export async function POST(request: NextRequest) {
   const signalType = type as SignalType;
   const payloadStr = typeof payload === "string" ? payload : null;
 
-  // Enforce "one active connection at a time": if the target is already busy,
-  // auto-decline the request instead of delivering it.
   if (signalType === "request") {
     const target = await prisma.presence.findUnique({
       where: { id: toId },
-      select: { busy: true },
     });
-    if (!target) {
-      // Target went offline — tell the initiator it was declined.
+    if (
+      !target ||
+      target.busy ||
+      target.peerId ||
+      sender.busy ||
+      sender.peerId
+    ) {
       await sendDecline(toId, fromId);
       return Response.json({ ok: true, autoDeclined: true });
     }
-    if (target.busy) {
-      await sendDecline(toId, fromId);
-      return Response.json({ ok: true, autoDeclined: true });
-    }
+
+    await prisma.invite.upsert({
+      where: { fromId_toId: { fromId, toId } },
+      create: { fromId, toId },
+      update: { createdAt: new Date() },
+    });
+    await prisma.signal.create({
+      data: { fromId, toId, type: signalType, payload: payloadStr },
+    });
+    return Response.json({ ok: true });
   }
 
-  // Busy transitions:
-  // - accept: the connection is now active → mark BOTH peers busy.
-  // - decline/end: free both peers.
   if (signalType === "accept") {
+    const invite = await prisma.invite.findUnique({
+      where: { fromId_toId: { fromId: toId, toId: fromId } },
+    });
+    if (!invite) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    await prisma.invite.delete({ where: { id: invite.id } });
     await prisma.presence.updateMany({
       where: { id: fromId },
       data: { busy: true, peerId: toId },
@@ -87,11 +100,65 @@ export async function POST(request: NextRequest) {
       where: { id: toId },
       data: { busy: true, peerId: fromId },
     });
-  } else if (signalType === "decline" || signalType === "end") {
+    await prisma.signal.create({
+      data: { fromId, toId, type: signalType, payload: payloadStr },
+    });
+    return Response.json({ ok: true });
+  }
+
+  if (signalType === "decline") {
+    const invite = await prisma.invite.findUnique({
+      where: { fromId_toId: { fromId: toId, toId: fromId } },
+    });
+    if (!invite) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    await prisma.invite.delete({ where: { id: invite.id } });
     await prisma.presence.updateMany({
       where: { id: { in: [fromId, toId] } },
       data: { busy: false, peerId: null },
     });
+    await prisma.signal.create({
+      data: { fromId, toId, type: signalType, payload: payloadStr },
+    });
+    return Response.json({ ok: true });
+  }
+
+  if (signalType === "end") {
+    const bothInvites = await prisma.invite.findMany({
+      where: {
+        OR: [
+          { fromId, toId },
+          { fromId: toId, toId: fromId },
+        ],
+      },
+    });
+    const allowed = sender.peerId === toId || bothInvites.length > 0;
+    if (!allowed) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    await prisma.presence.updateMany({
+      where: { id: { in: [fromId, toId] } },
+      data: { busy: false, peerId: null },
+    });
+    if (bothInvites.length > 0) {
+      await prisma.invite.deleteMany({
+        where: { id: { in: bothInvites.map((i) => i.id) } },
+      });
+    }
+    await prisma.signal.create({
+      data: { fromId, toId, type: signalType, payload: payloadStr },
+    });
+    return Response.json({ ok: true });
+  }
+
+  // offer, answer, ice
+  if (typeof payloadStr !== "string" || payloadStr.length === 0) {
+    return Response.json({ error: "invalid payload" }, { status: 400 });
+  }
+  const target = await prisma.presence.findUnique({ where: { id: toId } });
+  if (!target || sender.peerId !== toId || target.peerId !== fromId) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
   }
 
   await prisma.signal.create({

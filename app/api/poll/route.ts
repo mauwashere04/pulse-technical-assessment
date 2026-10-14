@@ -44,17 +44,26 @@ export async function GET(request: NextRequest) {
     select: { id: true, lat: true, lng: true, busy: true },
   });
 
-  // 4) Drain this user's mailbox: read, then delete exactly what we read so a
-  // concurrently-inserted signal is never lost.
-  const inbox = await prisma.signal.findMany({
-    where: { toId: id },
-    orderBy: { createdAt: "asc" },
-  });
-  if (inbox.length > 0) {
-    await prisma.signal.deleteMany({
-      where: { id: { in: inbox.map((s) => s.id) } },
-    });
-  }
+  // 4) Drain this user's mailbox in one statement, so two overlapping polls
+  // can never both deliver the same signal.
+  const inbox = await prisma.$queryRaw<
+    {
+      id: string;
+      fromId: string;
+      toId: string;
+      type: string;
+      payload: string | null;
+      createdAt: Date;
+    }[]
+  >`
+    DELETE FROM "Signal"
+    WHERE "id" IN (
+      SELECT "id" FROM "Signal"
+      WHERE "toId" = ${id}
+      ORDER BY "createdAt" ASC
+    )
+    RETURNING "id", "fromId", "toId", "type", "payload", "createdAt"
+  `;
 
   const response: PollResponse = {
     peers: peers.map((p) => ({
@@ -69,7 +78,7 @@ export async function GET(request: NextRequest) {
       toId: s.toId,
       type: s.type as PollResponse["signals"][number]["type"],
       payload: s.payload,
-      createdAt: s.createdAt.toISOString(),
+      createdAt: new Date(s.createdAt).toISOString(),
     })),
   };
 

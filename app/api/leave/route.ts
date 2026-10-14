@@ -41,6 +41,10 @@ export async function POST(request: NextRequest) {
     where: { OR: [{ toId: id }, { fromId: id }] },
   });
 
+  await prisma.invite.deleteMany({
+    where: { OR: [{ fromId: id }, { toId: id }] },
+  });
+
   if (row?.peerId) {
     await prisma.signal.create({
       data: { fromId: id, toId: row.peerId, type: "end", payload: null },
