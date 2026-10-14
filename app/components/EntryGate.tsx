@@ -4,8 +4,10 @@ import { useState } from "react";
 
 export default function EntryGate({
   onReady,
+  errorText,
 }: {
   onReady: (lat: number, lng: number) => void;
+  errorText?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "locating" | "error">("idle");
   const [error, setError] = useState<string>("");
@@ -52,6 +54,10 @@ export default function EntryGate({
 
       {status === "error" && (
         <p className="max-w-sm text-center text-sm text-red-400">{error}</p>
+      )}
+
+      {errorText && (
+        <p className="max-w-sm text-center text-sm text-red-400">{errorText}</p>
       )}
 
       <p className="max-w-sm text-center text-xs text-zinc-500">

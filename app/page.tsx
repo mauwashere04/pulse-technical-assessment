@@ -24,6 +24,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 export default function Home() {
   const [phase, setPhase] = useState<"gate" | "live">("gate");
+  const [gateError, setGateError] = useState<string>("");
   const [sessionId] = useState(() => crypto.randomUUID());
   const [peers, setPeers] = useState<PeerDot[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -329,13 +330,19 @@ export default function Home() {
   }, [sessionId, phase]);
 
   async function handleReady(lat: number, lng: number) {
-    setMyLocation({ lat, lng });
-    await join(sessionId, lat, lng);
-    setPhase("live");
+    setGateError("");
+    try {
+      const placed = await join(sessionId, lat, lng);
+      setMyLocation(placed);
+      setPhase("live");
+    } catch {
+      setPhase("gate");
+      setGateError("Could not enter. Check the connection and try again.");
+    }
   }
 
   if (phase === "gate") {
-    return <EntryGate onReady={handleReady} />;
+    return <EntryGate onReady={handleReady} errorText={gateError} />;
   }
 
   const inChat = conn.kind === "connecting" || conn.kind === "connected";

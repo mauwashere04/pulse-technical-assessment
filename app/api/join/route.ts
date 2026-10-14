@@ -43,5 +43,9 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return Response.json({ ok: true });
+  return Response.json({
+    ok: true,
+    lat: offset.lat,
+    lng: offset.lng,
+  });
 }
