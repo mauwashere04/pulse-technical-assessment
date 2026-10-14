@@ -36,33 +36,41 @@ export default function EntryGate({
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-8 bg-zinc-950 p-6 text-zinc-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Pulse</h1>
-        <p className="mt-2 max-w-sm text-zinc-400">
-          A living globe of anonymous strangers. Drop onto the map and connect.
-        </p>
-      </div>
+    <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-6 bg-[var(--bg)] p-6 text-center text-[var(--ink)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--brass)]">
+        One session. No account.
+      </p>
+
+      <h1
+        className="font-serif italic text-[var(--ink)]"
+        style={{ fontSize: "clamp(64px, 10vw, 120px)", lineHeight: 0.9 }}
+      >
+        Pulse
+      </h1>
+
+      <p className="max-w-[28rem] text-base text-[var(--muted)]">
+        Strangers, as dots on a globe. Tap one. Talk. Leave, and it is gone.
+      </p>
 
       <button
         onClick={enter}
         disabled={status === "locating"}
-        className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
+        className="rounded-full bg-[var(--signal)] px-7 py-3.5 text-[15px] font-semibold text-[#1a0c08] transition hover:opacity-90 disabled:opacity-60"
       >
-        {status === "locating" ? "Locating…" : "Enter Pulse"}
+        {status === "locating" ? "Finding a horizon…" : "Enter"}
       </button>
 
       {status === "error" && (
-        <p className="max-w-sm text-center text-sm text-red-400">{error}</p>
+        <p className="max-w-sm text-sm text-[var(--danger)]">{error}</p>
       )}
 
       {errorText && (
-        <p className="max-w-sm text-center text-sm text-red-400">{errorText}</p>
+        <p className="max-w-sm text-sm text-[var(--danger)]">{errorText}</p>
       )}
 
-      <p className="max-w-sm text-center text-xs text-zinc-500">
-        No sign-up. Your dot is placed 1–3&nbsp;km from your real location.
-        Nothing is stored — closing the tab ends everything.
+      <p className="max-w-[28rem] text-xs text-[var(--muted)]">
+        Your public dot is offset from your real location. Messages and video
+        stay between the two browsers.
       </p>
     </div>
   );

@@ -391,17 +391,17 @@ export default function Home() {
       />
 
       {notice && (
-        <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="pulse-glass absolute left-1/2 top-20 z-30 -translate-x-1/2 px-4 py-2 text-sm text-[var(--ink)]">
           {notice}
         </div>
       )}
 
       {conn.kind === "requesting" && (
-        <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="pulse-glass absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 px-4 py-2 text-sm text-[var(--ink)]">
           <span>Requesting connection…</span>
           <button
             onClick={cancelRequest}
-            className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
+            className="rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink)]/40"
           >
             Cancel
           </button>
@@ -433,7 +433,7 @@ export default function Home() {
       )}
 
       {video === "requesting" && (
-        <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="pulse-glass absolute bottom-24 left-1/2 z-30 -translate-x-1/2 px-4 py-2 text-sm text-[var(--ink)]">
           Waiting for stranger to accept video…
         </div>
       )}

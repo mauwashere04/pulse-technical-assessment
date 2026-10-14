@@ -39,35 +39,37 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+    <div
+      className="pulse-glass absolute inset-x-0 bottom-0 z-20 flex h-[48vh] flex-col rounded-b-none text-[var(--ink)] md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:h-full md:w-[400px] md:rounded-l-[20px] md:rounded-r-none"
+    >
+      <header className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
         <div>
           <p className="font-semibold">Stranger</p>
-          <p className="text-xs text-zinc-500">
-            {connected ? "Connected" : "Connecting…"}
+          <p className="text-xs text-[var(--muted)]">
+            {connected ? "Connected" : "Linking…"}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onStartVideo}
             disabled={!connected || videoBusy}
-            className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
+            className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm hover:border-[var(--ink)]/40 disabled:opacity-40"
           >
-            Video
+            Camera
           </button>
           <button
             onClick={onEnd}
-            className="rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400"
+            className="rounded-full bg-[var(--danger)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
           >
-            End
+            Leave
           </button>
         </div>
       </header>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <p className="mt-8 text-center text-sm text-zinc-500">
-            Say hello. Messages are peer-to-peer and never stored.
+          <p className="mt-8 text-center text-sm text-[var(--muted)]">
+            Nothing here is saved.
           </p>
         )}
         {messages.map((m) => (
@@ -76,11 +78,15 @@ export default function ChatPanel({
             className={`flex ${m.mine ? "justify-end" : "justify-start"}`}
           >
             <span
-              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+              className="max-w-[80%] rounded-2xl px-3 py-2 text-sm"
+              style={
                 m.mine
-                  ? "bg-emerald-400 text-zinc-950"
-                  : "bg-zinc-800 text-zinc-100"
-              }`}
+                  ? { background: "var(--signal)", color: "#1a0c08" }
+                  : {
+                      background: "rgba(244, 239, 230, 0.08)",
+                      color: "var(--ink)",
+                    }
+              }
             >
               {m.text}
             </span>
@@ -89,18 +95,21 @@ export default function ChatPanel({
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="flex gap-2 border-t border-zinc-800 p-3">
+      <form
+        onSubmit={submit}
+        className="flex gap-2 border-t border-[var(--line)] p-3"
+      >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={connected ? "Type a message…" : "Connecting…"}
+          placeholder={connected ? "Type a message…" : "Linking…"}
           disabled={!connected}
-          className="flex-1 rounded-full bg-zinc-900 px-4 py-2 text-sm outline-none placeholder:text-zinc-600 focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+          className="flex-1 rounded-full bg-white/5 px-4 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:ring-1 focus:ring-[var(--signal)] disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!connected || !draft.trim()}
-          className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+          className="rounded-full bg-[var(--signal)] px-4 py-2 text-sm font-semibold text-[#1a0c08] disabled:opacity-40"
         >
           Send
         </button>

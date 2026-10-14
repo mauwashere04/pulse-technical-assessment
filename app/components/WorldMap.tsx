@@ -7,12 +7,21 @@ import type { PeerDot } from "@/lib/types";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
+const DOT_PALETTE = [
+  "#ff5c39",
+  "#f2c14e",
+  "#7eb8a2",
+  "#d7c4a3",
+  "#e7e1d6",
+  "#c46b4a",
+];
+
 function dotColor(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) | 0;
   }
-  return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+  return DOT_PALETTE[Math.abs(hash) % DOT_PALETTE.length];
 }
 
 export default function WorldMap({
@@ -41,7 +50,7 @@ export default function WorldMap({
     canConnectRef.current = canConnect;
   });
 
-  // Initialise the map once.
+  // Initialise the globe once.
   useEffect(() => {
     if (!TOKEN || !containerRef.current) return;
     let cancelled = false;
@@ -54,10 +63,21 @@ export default function WorldMap({
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/dark-v11",
+        projection: "globe",
+        antialias: true,
         // Open centered on the user if we know where they are, else world view.
-        center: me ? [me.lng, me.lat] : [0, 20],
-        zoom: me ? 4 : 1.4,
+        center: me ? [me.lng, me.lat] : [0, 12],
+        zoom: me ? 2.2 : 1.35,
         attributionControl: true,
+      });
+      map.on("style.load", () => {
+        map.setFog({
+          color: "rgb(7, 8, 13)",
+          "high-color": "rgb(36, 52, 74)",
+          "horizon-blend": 0.12,
+          "space-color": "rgb(4, 5, 10)",
+          "star-intensity": 0.4,
+        });
       });
       map.on("load", () => {
         if (!cancelled) setReady(true);
@@ -79,7 +99,7 @@ export default function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show / move the user's own "you are here" pin.
+  // Show / move the user's own "You" marker.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !me) return;
@@ -92,9 +112,8 @@ export default function WorldMap({
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">Me</span>📍`;
-        // anchor "bottom" → the pin's tip sits on the exact coordinate.
-        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        el.innerHTML = `<span class="pulse-me-label">You</span><span class="pulse-me-ring"></span>`;
+        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
           .setLngLat([me.lng, me.lat])
           .addTo(map);
       } else {
@@ -126,6 +145,7 @@ export default function WorldMap({
           const el = document.createElement("button");
           el.className = "pulse-dot";
           el.style.background = dotColor(peer.id);
+          el.style.borderColor = dotColor(peer.id);
           el.title = "Tap to connect";
           el.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -136,7 +156,7 @@ export default function WorldMap({
             .addTo(map);
           markers.set(peer.id, marker);
         }
-        marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
+        marker.getElement().classList.toggle("pulse-dot--busy", peer.busy);
       }
 
       // Drop markers for peers that went offline / got filtered out.
@@ -155,20 +175,20 @@ export default function WorldMap({
 
   return (
     <div className="absolute inset-0">
-      <div ref={containerRef} className="h-full w-full bg-zinc-900" />
+      <div ref={containerRef} className="h-full w-full bg-[var(--bg)]" />
 
       {!TOKEN && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-          <p className="max-w-md rounded-lg bg-zinc-800 p-4 text-sm text-zinc-200">
+          <p className="pulse-glass max-w-md p-4 text-sm text-[var(--ink)]">
             Set{" "}
-            <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_TOKEN</code> in{" "}
-            <code>.env</code> to load the map.
+            <code className="text-[var(--brass)]">NEXT_PUBLIC_MAPBOX_TOKEN</code>{" "}
+            in <code>.env</code> to load the globe.
           </p>
         </div>
       )}
 
       {/* Online count */}
-      <div className="absolute bottom-4 left-4 rounded-full bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
+      <div className="pulse-glass absolute bottom-4 left-4 px-3 py-1.5 text-xs text-[var(--ink)]">
         {peers.length} online
       </div>
     </div>
