@@ -22,9 +22,25 @@ export async function POST(request: NextRequest) {
 
   // Independent cleanup deletes — no atomicity needed (and interactive
   // transactions are unreliable over a PgBouncer pooler).
+  const row = await prisma.presence.findUnique({
+    where: { id },
+    select: { peerId: true },
+  });
+
   await prisma.signal.deleteMany({
     where: { OR: [{ toId: id }, { fromId: id }] },
   });
+
+  if (row?.peerId) {
+    await prisma.signal.create({
+      data: { fromId: id, toId: row.peerId, type: "end", payload: null },
+    });
+    await prisma.presence.updateMany({
+      where: { id: row.peerId },
+      data: { busy: false, peerId: null },
+    });
+  }
+
   await prisma.presence.deleteMany({ where: { id } });
 
   return Response.json({ ok: true });

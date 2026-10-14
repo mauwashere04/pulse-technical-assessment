@@ -51,6 +51,7 @@ export default function Home() {
   const peerRef = useRef<PeerSession | null>(null);
   const msgId = useRef(0);
   const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const missingPeerPolls = useRef(0);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -280,6 +281,30 @@ export default function Home() {
         const data = await poll(sessionId);
         if (!active) return;
         setPeers(data.peers);
+
+        const current = connRef.current;
+        if (current.kind !== "idle") {
+          const stillThere = data.peers.some((p) => p.id === current.peerId);
+          if (!stillThere) {
+            missingPeerPolls.current += 1;
+            if (missingPeerPolls.current >= 2) {
+              missingPeerPolls.current = 0;
+              if (current.kind === "incoming") {
+                setConn({ kind: "idle" });
+              } else if (current.kind === "requesting") {
+                teardown("They left.");
+              } else {
+                void sendSignal(sessionId, current.peerId, "end");
+                teardown("Stranger disconnected.");
+              }
+            }
+          } else {
+            missingPeerPolls.current = 0;
+          }
+        } else {
+          missingPeerPolls.current = 0;
+        }
+
         for (const s of data.signals) processSignalRef.current(s);
       } catch {}
       if (active) timer = setTimeout(tick, POLL_INTERVAL_MS);
