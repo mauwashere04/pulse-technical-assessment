@@ -149,8 +149,7 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = dotColor(peer.id);
-          el.style.borderColor = dotColor(peer.id);
+          el.style.setProperty("--dot-color", dotColor(peer.id));
           el.title = "Tap to connect";
           el.addEventListener("click", (e) => {
             e.stopPropagation();

@@ -403,7 +403,8 @@ export default function Home() {
     if (!session || conn.kind !== "idle" || !waveSendable) return;
     setWaveSendable(false);
     window.setTimeout(() => setWaveSendable(true), 8_000);
-    await wave(session.id, session.secret);
+    const ok = await wave(session.id, session.secret);
+    showNotice(ok ? "Wave sent." : "Could not send wave.");
   }
 
   async function handleReady(lat: number, lng: number, horizon: Horizon) {
