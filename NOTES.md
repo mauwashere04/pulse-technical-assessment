@@ -49,6 +49,14 @@
   border — which erased the contrast ring and made some colors hard to spot against
   the globe. Simplified to one fixed color for every peer dot with a dark contrast
   ring always on top, after live two-browser testing surfaced the visibility gap.
+- Added a looping ambient video background to the entry gate (AI-generated via Google
+  Flow, prompted for a dark starfield with a faint brass/orange glow, nothing bright
+  or detailed in the center where the text sits). Browsers can't play `<video>` in
+  reverse, so a true forward-then-reverse "boomerang" loop was baked into one file
+  with ffmpeg (`reverse` + `concat` filters) rather than faked at runtime — guarantees
+  a seamless seam with no extra JS. A radial dark overlay sits on top regardless of
+  how dark the raw clip is, and `prefers-reduced-motion` skips calling `.play()`
+  entirely, leaving it on its static poster frame.
 
 ## Phase 3 — Make it secure
 
