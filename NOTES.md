@@ -97,6 +97,21 @@ Ranked by what I'd fix first before shipping:
   any two peers that point at each other, and a separate line from "You" to whoever
   you're currently talking to. No new identity is exposed beyond what `busy` already
   implied — just that two anonymous dots are paired, same as before.
+- **Switch connections.** Originally a request to someone already busy was silently
+  auto-declined server-side — they never even saw it. Changed, on request: the target's
+  own busy state no longer blocks delivery, only the sender's does, so a busy person
+  now sees "Someone else wants to connect" (offered only in plain text chat, not mid
+  video-call, to dodge a z-index fight with the full-screen video view) and can accept
+  to end their current chat and switch, or decline and stay. Accepting awaits the "end"
+  signal to the old partner before sending "accept" to the new one — unawaited, the two
+  requests could race and the old partner could be left stuck busy forever.
+  Implementing this surfaced a real latent bug: `decline` and `end` both cleared
+  `busy`/`peerId` for both ids unconditionally, which was only ever safe because a busy
+  target could never receive a second invite before. Now that it can, a stale decline
+  or end for an abandoned invite could have wiped out someone's unrelated *active*
+  connection. Fixed everywhere this pattern appeared (signal's decline/end, leave,
+  block): only clear a side's busy/peerId if it still points at the other side of
+  *that* exchange, never blindly.
 - **Block** — a two-tap "Block them?" confirm hides that person from your map (and
   you from theirs) for the rest of the session, ends any active connection, and
   prevents them reaching you again without ever telling them they were blocked (it
