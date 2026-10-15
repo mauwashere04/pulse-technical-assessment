@@ -237,8 +237,11 @@ export default function Home() {
 
   function endVideo() {
     const ps = peerRef.current;
-    ps?.stopVideo();
+    // Tell the peer first, then tear down tracks — stopping/removing tracks
+    // triggers renegotiation, and that should never race the control message
+    // that tells the other side the call ended.
     ps?.sendControl("video-end");
+    ps?.stopVideo();
     setLocalStream(null);
     setRemoteStream(null);
     setVideo("none");
