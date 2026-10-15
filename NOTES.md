@@ -83,6 +83,12 @@ Ranked by what I'd fix first before shipping:
   by matching the wave's `lat`/`lng` against the current peer list on the client —
   same stored offset, read twice, no identity ever sent. A ripple marker is still the
   fallback for the rare poll tick where a brand-new peer's own dot isn't up yet.
+- **Connection lines.** Two connected dots now get a dashed line between them,
+  visible to everyone — the globe reads as *alive*, not just occupied. The poll
+  response already carried `peerId`; exposing it let the client draw a line between
+  any two peers that point at each other, and a separate line from "You" to whoever
+  you're currently talking to. No new identity is exposed beyond what `busy` already
+  implied — just that two anonymous dots are paired, same as before.
 - **Block** — a two-tap "Block them?" confirm hides that person from your map (and
   you from theirs) for the rest of the session, ends any active connection, and
   prevents them reaching you again without ever telling them they were blocked (it
