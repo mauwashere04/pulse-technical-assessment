@@ -39,8 +39,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (session.peerId === blockedId) {
+    // Only clear each side if it still points at the other — blockedId may
+    // have moved on to a different connection since the session was read.
     await prisma.presence.updateMany({
-      where: { id: { in: [id, blockedId] } },
+      where: { id, peerId: blockedId },
+      data: { busy: false, peerId: null },
+    });
+    await prisma.presence.updateMany({
+      where: { id: blockedId, peerId: id },
       data: { busy: false, peerId: null },
     });
     await prisma.signal.create({

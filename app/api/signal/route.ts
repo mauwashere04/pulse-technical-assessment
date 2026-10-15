@@ -75,14 +75,10 @@ export async function POST(request: NextRequest) {
         ],
       },
     });
-    if (
-      !target ||
-      target.busy ||
-      target.peerId ||
-      sender.busy ||
-      sender.peerId ||
-      blocked
-    ) {
+    // The target may be busy with someone else — that's allowed through now,
+    // so a busy person can see the request and choose to switch. Only the
+    // sender's own state and blocks still auto-decline here.
+    if (!target || sender.busy || sender.peerId || blocked) {
       await sendDecline(toId, fromId);
       return Response.json({ ok: true, autoDeclined: true });
     }
@@ -128,10 +124,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
     await prisma.invite.delete({ where: { id: invite.id } });
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: false, peerId: null },
-    });
+    // A decliner may be busy with someone else (declining a switch offer).
+    // Only clear a side's busy/peerId if it still points at the other side
+    // of THIS exchange (or nowhere) — never an unrelated active pairing.
+    await releasePairIfMatched(fromId, toId);
+    await releasePairIfMatched(toId, fromId);
     await prisma.signal.create({
       data: { fromId, toId, type: signalType, payload: payloadStr },
     });
@@ -151,10 +148,8 @@ export async function POST(request: NextRequest) {
     if (!allowed) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: false, peerId: null },
-    });
+    await releasePairIfMatched(fromId, toId);
+    await releasePairIfMatched(toId, fromId);
     if (bothInvites.length > 0) {
       await prisma.invite.deleteMany({
         where: { id: { in: bothInvites.map((i) => i.id) } },
@@ -186,5 +181,14 @@ export async function POST(request: NextRequest) {
 async function sendDecline(targetId: string, initiatorId: string) {
   await prisma.signal.create({
     data: { fromId: targetId, toId: initiatorId, type: "decline", payload: null },
+  });
+}
+
+// Clear `id`'s busy/peerId only if it still points at `counterpart` or
+// nowhere — never an unrelated connection `id` has since moved on to.
+async function releasePairIfMatched(id: string, counterpart: string) {
+  await prisma.presence.updateMany({
+    where: { id, OR: [{ peerId: null }, { peerId: counterpart }] },
+    data: { busy: false, peerId: null },
   });
 }

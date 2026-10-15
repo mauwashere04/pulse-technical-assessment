@@ -51,6 +51,15 @@ export default function Home() {
     _setConn(c);
   };
 
+  // A request that arrived while already connected to someone else — shown
+  // as a "switch?" prompt instead of being auto-declined.
+  const [pendingIncoming, _setPendingIncoming] = useState<string | null>(null);
+  const pendingIncomingRef = useRef<string | null>(null);
+  const setPendingIncoming = (v: string | null) => {
+    pendingIncomingRef.current = v;
+    _setPendingIncoming(v);
+  };
+
   const [video, _setVideo] = useState<VideoState>("none");
   const videoRef = useRef<VideoState>(video);
   const setVideo = (v: VideoState) => {
@@ -62,6 +71,7 @@ export default function Home() {
   const msgId = useRef(0);
   const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const missingPeerPolls = useRef(0);
+  const missingTransferPolls = useRef(0);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -208,6 +218,40 @@ export default function Home() {
     teardown("Blocked for this session.");
   }
 
+  // Someone requested while we were already connected. Accepting ends the
+  // current connection first (awaited, so the server processes the "end"
+  // before the new "accept" — otherwise a race could leave the old partner
+  // stuck busy) and then switches to the new one.
+  function acceptTransfer() {
+    const newPeerId = pendingIncomingRef.current;
+    if (!newPeerId || !session) return;
+    setPendingIncoming(null);
+
+    void (async () => {
+      const old = connRef.current;
+      if (old.kind === "connecting" || old.kind === "connected") {
+        await sendSignal(session.id, old.peerId, "end", session.secret);
+      }
+      peerRef.current?.close();
+      peerRef.current = null;
+      setLocalStream(null);
+      setRemoteStream(null);
+      setVideo("none");
+      setMessages([]);
+
+      startPeer(newPeerId, false);
+      await sendSignal(session.id, newPeerId, "accept", session.secret);
+      setConn({ kind: "connecting", peerId: newPeerId });
+    })();
+  }
+
+  function declineTransfer() {
+    const requesterId = pendingIncomingRef.current;
+    if (!requesterId || !session) return;
+    setPendingIncoming(null);
+    void sendSignal(session.id, requesterId, "decline", session.secret);
+  }
+
   function startVideoRequest() {
     if (videoRef.current !== "none" || !peerRef.current) return;
     setVideo("requesting");
@@ -252,6 +296,13 @@ export default function Home() {
       case "request": {
         if (connRef.current.kind === "idle") {
           setConn({ kind: "incoming", peerId: sig.fromId });
+        } else if (
+          connRef.current.kind === "connected" &&
+          videoRef.current === "none"
+        ) {
+          // Busy, but in plain text chat (not mid-video-call) — offer a
+          // switch instead of silently declining.
+          setPendingIncoming(sig.fromId);
         } else if (sessionRef.current) {
           void sendSignal(
             sessionRef.current.id,
@@ -318,7 +369,9 @@ export default function Home() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
-      if (videoRef.current === "incoming") {
+      if (pendingIncomingRef.current) {
+        declineTransfer();
+      } else if (videoRef.current === "incoming") {
         declineVideo();
       } else if (
         videoRef.current === "active" ||
@@ -374,6 +427,23 @@ export default function Home() {
           }
         } else {
           missingPeerPolls.current = 0;
+        }
+
+        if (pendingIncomingRef.current) {
+          const requesterStillThere = data.peers.some(
+            (p) => p.id === pendingIncomingRef.current,
+          );
+          if (!requesterStillThere) {
+            missingTransferPolls.current += 1;
+            if (missingTransferPolls.current >= 2) {
+              missingTransferPolls.current = 0;
+              setPendingIncoming(null);
+            }
+          } else {
+            missingTransferPolls.current = 0;
+          }
+        } else {
+          missingTransferPolls.current = 0;
         }
 
         for (const s of data.signals) processSignalRef.current(s);
@@ -470,6 +540,17 @@ export default function Home() {
           declineLabel="Decline"
           onAccept={acceptIncoming}
           onDecline={declineIncoming}
+        />
+      )}
+
+      {pendingIncoming && (
+        <ConnectionPrompt
+          title="Someone else wants to connect"
+          subtitle="Accepting ends your current chat and starts a new one."
+          acceptLabel="Switch"
+          declineLabel="Stay"
+          onAccept={acceptTransfer}
+          onDecline={declineTransfer}
         />
       )}
 

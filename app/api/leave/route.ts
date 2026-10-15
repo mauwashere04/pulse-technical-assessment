@@ -55,8 +55,10 @@ export async function POST(request: NextRequest) {
     await prisma.signal.create({
       data: { fromId: id, toId: row.peerId, type: "end", payload: null },
     });
+    // Only clear the partner if they still point back at us — they may
+    // have already moved on to a different connection since we last polled.
     await prisma.presence.updateMany({
-      where: { id: row.peerId },
+      where: { id: row.peerId, peerId: id },
       data: { busy: false, peerId: null },
     });
   }
