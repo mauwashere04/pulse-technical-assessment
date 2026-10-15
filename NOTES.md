@@ -132,3 +132,19 @@ Ranked by what I'd fix first before shipping:
 - STUN only, no TURN — a documented, accepted gap.
 - Mapbox `dark-v11` style with the `globe` projection.
 - The database holds only disposable session data.
+
+## Hit live: STUN-only failure on the *same* WiFi
+
+Live-tested laptop + phone on the same WiFi and the call never connected — local
+camera showed, remote never arrived, stuck on "Waiting for their camera...". Worth
+recording because the obvious assumption (STUN only fails *across* NATs/networks)
+doesn't explain same-network failures. The likely cause here is **AP/client
+isolation**: many home and most guest/public routers block devices on the same
+SSID from reaching each other directly even though they share a network — ICE
+gathers candidates fine but no pair ever succeeds, which looks identical to the
+cross-NAT case from the client's side. Confirmable via `chrome://webrtc-internals`
+mid-call (all candidate pairs `failed`, none `succeeded`).
+The fix for either cause is the same — a TURN relay — but `AGENTS.md` explicitly
+rules that out ("Do not add ... a TURN server"), and the README calls this exact
+failure mode an allowed, undone limitation. Documenting it here instead, per the
+README's own instruction to do exactly that if actually hit.
