@@ -22,12 +22,16 @@
   opaque auth error instead of the "set your token" state. Also dropped a leftover
   ngrok host from `next.config.ts`, and the "you" pin now shows the server-stored
   offset, never the raw GPS fix.
+- **Found live, post-deploy:** `video-end` stopped local tracks *before* sending the
+  control message over the data channel — track removal triggers renegotiation, which
+  could race the message and drop it, leaving the other side's video stuck open.
+  Reordered to send first, then tear down tracks.
 
 ## Phase 2 — Make it good
 
-- Rebuilt Pulse as a night globe: Mapbox's `globe` projection with fog, a six-color
-  dot palette, Instrument Serif for the wordmark, Outfit everywhere else, a warm
-  brass/orange/ink palette instead of generic zinc-and-emerald.
+- Rebuilt Pulse as a night globe: Mapbox's `globe` projection with fog, Instrument
+  Serif for the wordmark, Outfit everywhere else, a warm brass/orange/ink palette
+  instead of generic zinc-and-emerald.
 - The globe *is* the layout — chat and prompts float as glass panels over it instead
   of carving it into a smaller box.
 - Chat is a 48vh bottom sheet under 768px so the globe stays visible on a phone, and
@@ -35,6 +39,10 @@
 - Busy peers are a hollow ring, not a dimmed filled dot — reads as "in a
   conversation," not "about to disappear."
 - `prefers-reduced-motion: reduce` turns off the dot pulse and the wave ripple.
+- Peer dots originally used a six-color hash palette, each matched to a same-colored
+  border — which erased the contrast ring and made some colors hard to spot against
+  the globe. Simplified to one fixed color for every peer dot with a dark contrast
+  ring always on top, after live two-browser testing surfaced the visibility gap.
 
 ## Phase 3 — Make it secure
 
@@ -63,6 +71,12 @@ Ranked by what I'd fix first before shipping:
 - **Waves** — a content-free ripple at your own public dot, visible to everyone for
   12s, at most once every 8s. The payload is only `{ id, lat, lng }` — no sender id,
   no text. The "alive" half: say you're here without starting a conversation.
+  Live testing showed the ripple alone (a thin 2px ring, 2.4s) was easy to miss, so
+  two follow-ups: an immediate "Wave sent." toast on click, independent of the
+  animation; and the sender's actual dot now blinks orange while their wave is live,
+  by matching the wave's `lat`/`lng` against the current peer list on the client —
+  same stored offset, read twice, no identity ever sent. A ripple marker is still the
+  fallback for the rare poll tick where a brand-new peer's own dot isn't up yet.
 - **Block** — a two-tap "Block them?" confirm hides that person from your map (and
   you from theirs) for the rest of the session, ends any active connection, and
   prevents them reaching you again without ever telling them they were blocked (it
