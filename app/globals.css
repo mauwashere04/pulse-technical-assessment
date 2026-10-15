@@ -9,6 +9,7 @@
   --brass: #f2c14e;
   --danger: #e23d3d;
   --glass: rgba(12, 14, 20, 0.78);
+  --peer: #7eb8a2;
 }
 
 @theme inline {
@@ -32,14 +33,14 @@ body {
   border-radius: 20px;
 }
 
-/* Live user dots on the globe. Idle dots are filled with the peer's own
-   color behind a dark contrast ring, so they read clearly against any
-   terrain color on the globe. */
+/* Live user dots on the globe. One fixed color for every peer, behind a
+   dark contrast ring, so every dot reads the same and stays legible against
+   any terrain color on the globe. */
 .pulse-dot {
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: var(--dot-color, var(--signal));
+  background: var(--peer);
   border: 2px solid rgba(7, 8, 13, 0.6);
   cursor: pointer;
   padding: 0;
@@ -52,14 +53,19 @@ body {
   transform: scale(1.3);
 }
 
-/* Busy peers show a hollow ring instead of a filled, animated dot — the
-   ring keeps the peer's own color so it's still identifiable with no fill. */
+/* Busy peers show a hollow ring instead of a filled, animated dot. */
 .pulse-dot.pulse-dot--busy {
   background: transparent !important;
   border-width: 2px;
-  border-color: var(--dot-color, var(--signal));
+  border-color: var(--peer);
   animation: none;
   box-shadow: none;
+}
+
+/* A peer's dot blinks into the signal color while their wave is live —
+   matched purely by coordinates on the client, never by identity. */
+.pulse-dot--waving {
+  animation: pulse-dot-blink 0.6s ease-in-out infinite;
 }
 
 /* The user's own "You" marker — a brass ring with a soft outer glow. */
@@ -89,6 +95,11 @@ body {
   letter-spacing: 0.04em;
   color: var(--ink);
   white-space: nowrap;
+}
+
+/* Your own dot blinks the same way while your wave is live. */
+.pulse-me--waving .pulse-me-ring {
+  animation: pulse-me-blink 0.6s ease-in-out infinite;
 }
 
 /* Short-lived wave ripple (Task 13). */
@@ -125,9 +136,44 @@ body {
   }
 }
 
+@keyframes pulse-dot-blink {
+  0%,
+  100% {
+    background: var(--peer);
+    box-shadow: 0 0 0 0 rgba(255, 92, 57, 0.6);
+  }
+  50% {
+    background: var(--signal);
+    box-shadow: 0 0 0 10px rgba(255, 92, 57, 0);
+  }
+}
+
+@keyframes pulse-me-blink {
+  0%,
+  100% {
+    background: var(--brass);
+    box-shadow: 0 0 0 6px rgba(242, 193, 78, 0.18);
+  }
+  50% {
+    background: var(--signal);
+    box-shadow: 0 0 0 10px rgba(255, 92, 57, 0.35);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pulse-dot,
   .pulse-wave {
     animation: none;
+  }
+
+  /* Still convey the waving state without motion: a static color swap. */
+  .pulse-dot--waving {
+    animation: none;
+    background: var(--signal);
+  }
+
+  .pulse-me--waving .pulse-me-ring {
+    animation: none;
+    background: var(--signal);
   }
 }

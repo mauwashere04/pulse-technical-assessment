@@ -7,23 +7,6 @@ import type { PeerDot, WaveDot } from "@/lib/types";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-const DOT_PALETTE = [
-  "#ff5c39",
-  "#f2c14e",
-  "#7eb8a2",
-  "#d7c4a3",
-  "#e7e1d6",
-  "#c46b4a",
-];
-
-function dotColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  }
-  return DOT_PALETTE[Math.abs(hash) % DOT_PALETTE.length];
-}
-
 export default function WorldMap({
   peers,
   me,
@@ -149,7 +132,6 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.setProperty("--dot-color", dotColor(peer.id));
           el.title = "Tap to connect";
           el.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -177,19 +159,51 @@ export default function WorldMap({
     };
   }, [peers, ready]);
 
-  // Reconcile short-lived wave ripples (Task 13).
+  // Reconcile wave feedback (Task 13). A wave's lat/lng is read server-side
+  // straight from the same Presence row as the peer list — the exact same
+  // stored offset, never recomputed — so matching on exact coordinates tells
+  // us whose dot just waved without the server ever naming them: the API
+  // never sends a wave's fromId, by design, to keep waves anonymous.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    let cancelled = false;
 
+    const matchedPeerIds = new Set<string>();
+    let selfWaving = false;
+    const unmatched: WaveDot[] = [];
+
+    for (const w of waves) {
+      if (me && w.lat === me.lat && w.lng === me.lng) {
+        selfWaving = true;
+        continue;
+      }
+      const peer = peers.find((p) => p.lat === w.lat && p.lng === w.lng);
+      if (peer) {
+        matchedPeerIds.add(peer.id);
+      } else {
+        unmatched.push(w);
+      }
+    }
+
+    meMarkerRef.current
+      ?.getElement()
+      .classList.toggle("pulse-me--waving", selfWaving);
+    for (const [id, marker] of markersRef.current) {
+      marker
+        .getElement()
+        .classList.toggle("pulse-dot--waving", matchedPeerIds.has(id));
+    }
+
+    // Fallback ripple for a wave that doesn't line up with a visible dot yet
+    // (e.g. the one poll tick before a brand-new peer's own marker exists).
+    let cancelled = false;
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
       const markers = waveMarkersRef.current;
       const seen = new Set<string>();
 
-      for (const w of waves) {
+      for (const w of unmatched) {
         seen.add(w.id);
         if (markers.has(w.id)) continue;
         const el = document.createElement("div");
@@ -211,7 +225,7 @@ export default function WorldMap({
     return () => {
       cancelled = true;
     };
-  }, [waves, ready]);
+  }, [waves, peers, me, ready]);
 
   return (
     <div className="absolute inset-0">
