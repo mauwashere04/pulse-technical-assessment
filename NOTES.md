@@ -26,6 +26,12 @@
   control message over the data channel — track removal triggers renegotiation, which
   could race the message and drop it, leaving the other side's video stuck open.
   Reordered to send first, then tear down tracks.
+- **Found live, post-deploy:** the remote video during a call could grow past its box
+  at wide viewports and cover the "End camera" button entirely — a classic flexbox
+  gap, where a flex child's default `min-height: auto` lets its content (the video,
+  sized to its native resolution) push past the space `flex-1` actually allotted it.
+  Fixed by clipping that box to its given space (`min-height: 0` + `overflow: hidden`)
+  so the video is always cropped to fit, never the layout stretched to fit the video.
 
 ## Phase 2 — Make it good
 
