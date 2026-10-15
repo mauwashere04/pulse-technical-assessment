@@ -95,8 +95,13 @@ Ranked by what I'd fix first before shipping:
   just looks like a normal decline). It doesn't survive a refresh — a new session is
   a new id, so the block resets. That's the stated trade-off of "nothing persists,"
   not a bug.
-- With more time: a TURN server for strict NATs, and a way to keep a block across a
-  refresh without storing anything identifying.
+- With more time: a TURN server for strict NATs, a way to keep a block across a
+  refresh without storing anything identifying, and group connections (3+ people in
+  one chat, joinable only with every existing member's consent). Deliberately scoped
+  out here — it's not an add-on but a different architecture: connections are 1-to-1
+  everywhere (schema, signaling protocol, the WebRTC client), and chat/video are
+  peer-to-peer by design with no media server, so N people means a full mesh of
+  N−1 connections each, negotiated over polling. That's a rebuild, not a feature.
 
 ## Assumptions
 
