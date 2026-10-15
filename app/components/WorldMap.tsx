@@ -2,21 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import type { Map as MapboxMap, Marker } from "mapbox-gl";
+import type { Map as MapboxMap, Marker, GeoJSONSource } from "mapbox-gl";
 import type { PeerDot, WaveDot } from "@/lib/types";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+
+const CONNECTIONS_SOURCE_ID = "pulse-connections";
+const CONNECTIONS_LAYER_ID = "pulse-connections-layer";
 
 export default function WorldMap({
   peers,
   me,
   waves,
+  selfPeerId,
   onPeerClick,
   canConnect,
 }: {
   peers: PeerDot[];
   me: { lat: number; lng: number } | null;
   waves: WaveDot[];
+  selfPeerId?: string | null;
   onPeerClick: (id: string) => void;
   canConnect: boolean;
 }) {
@@ -63,6 +68,21 @@ export default function WorldMap({
           "horizon-blend": 0.12,
           "space-color": "rgb(4, 5, 10)",
           "star-intensity": 0.4,
+        });
+        map.addSource(CONNECTIONS_SOURCE_ID, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        map.addLayer({
+          id: CONNECTIONS_LAYER_ID,
+          type: "line",
+          source: CONNECTIONS_SOURCE_ID,
+          paint: {
+            "line-color": "#ff5c39",
+            "line-width": 1.5,
+            "line-opacity": 0.55,
+            "line-dasharray": [1, 2],
+          },
         });
       });
       map.on("load", () => {
@@ -158,6 +178,59 @@ export default function WorldMap({
       cancelled = true;
     };
   }, [peers, ready]);
+
+  // Draw a dashed line between any two connected dots. Matched purely from
+  // the `peerId` pairing already in the poll response, so a third party can
+  // see two strangers are talking without learning anything about who they
+  // are — same anonymity level as the dots themselves.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !map.getSource(CONNECTIONS_SOURCE_ID)) return;
+
+    const byId = new Map(peers.map((p) => [p.id, p]));
+    const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+    const drawn = new Set<string>();
+
+    for (const peer of peers) {
+      if (!peer.peerId) continue;
+      const partner = byId.get(peer.peerId);
+      if (!partner) continue;
+      const key = [peer.id, partner.id].sort().join(":");
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      features.push({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [peer.lng, peer.lat],
+            [partner.lng, partner.lat],
+          ],
+        },
+      });
+    }
+
+    if (me && selfPeerId) {
+      const partner = byId.get(selfPeerId);
+      if (partner) {
+        features.push({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [me.lng, me.lat],
+              [partner.lng, partner.lat],
+            ],
+          },
+        });
+      }
+    }
+
+    const source = map.getSource(CONNECTIONS_SOURCE_ID) as GeoJSONSource;
+    source.setData({ type: "FeatureCollection", features });
+  }, [peers, me, selfPeerId, ready]);
 
   // Reconcile wave feedback (Task 13). A wave's lat/lng is read server-side
   // straight from the same Presence row as the peer list — the exact same

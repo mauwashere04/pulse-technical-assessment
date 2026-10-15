@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       id: { notIn: [id, ...hidden] },
       lastSeen: { gte: staleCutoff },
     },
-    select: { id: true, lat: true, lng: true, busy: true },
+    select: { id: true, lat: true, lng: true, busy: true, peerId: true },
   });
 
   // 4) Drain this user's mailbox in one statement, so two overlapping polls
@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
       lat: p.lat,
       lng: p.lng,
       busy: p.busy,
+      peerId: p.peerId,
     })),
     signals: inbox.map((s) => ({
       id: s.id,

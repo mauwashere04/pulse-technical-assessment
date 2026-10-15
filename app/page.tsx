@@ -432,6 +432,7 @@ export default function Home() {
         peers={peers}
         me={myLocation}
         waves={waves}
+        selfPeerId={conn.kind === "connected" ? conn.peerId : null}
         onPeerClick={requestConnection}
         canConnect={conn.kind === "idle"}
       />
