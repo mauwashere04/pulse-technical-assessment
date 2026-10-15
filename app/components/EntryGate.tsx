@@ -73,7 +73,7 @@ export default function EntryGate({
         }}
       />
 
-      <div className="relative z-10 flex min-h-full flex-col items-center justify-center gap-6 p-6 text-center text-[var(--ink)]">
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6 text-center text-[var(--ink)]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--brass)]">
           One session. No account.
         </p>
